@@ -1,29 +1,36 @@
-// Composition root of the application: reads configuration, registers routes and starts the
-// HTTP server. Business logic lives in internal/service; HTTP mapping in internal/controller.
+// Composition root of the application: reads configuration, wires the layers, registers the
+// routes and starts the HTTP server. Business logic lives in internal/service; HTTP mapping in
+// internal/controller.
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"backend/internal/controller"
+	"backend/internal/service"
 )
 
 const (
-	defaultPort       = "8080"
-	readHeaderTimeout = 5 * time.Second
-	readTimeout       = 10 * time.Second
-	writeTimeout      = 10 * time.Second
+	defaultPort          = "8080"
+	defaultAllowedOrigin = "http://localhost:5173"
+	readHeaderTimeout    = 5 * time.Second
+	readTimeout          = 10 * time.Second
+	writeTimeout         = 10 * time.Second
 )
 
 func main() {
+	evaluatorController := controller.NewEvaluator(service.NewEvaluator())
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", handleHealth)
+	mux.HandleFunc("POST /api/v1/evaluate", evaluatorController.Evaluate)
+	mux.HandleFunc("GET /api/v1/health", evaluatorController.Health)
 
 	server := &http.Server{
 		Addr:              ":" + envOrDefault("PORT", defaultPort),
-		Handler:           mux,
+		Handler:           controller.CORS(envOrDefault("ALLOWED_ORIGIN", defaultAllowedOrigin), mux),
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
@@ -35,16 +42,10 @@ func main() {
 	}
 }
 
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-		log.Printf("failed to write health response: %v", err)
-	}
-}
-
 func envOrDefault(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+
 	return fallback
 }
