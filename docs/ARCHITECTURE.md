@@ -50,7 +50,7 @@ fourth layer without touching the service.
 ---
 
 ## ADR-004 — A single `POST /api/v1/calculate` endpoint
-**Status:** Accepted
+**Status:** Superseded by ADR-011
 
 **Context.** Seven operations could be seven endpoints.
 
@@ -144,3 +144,50 @@ lives (`internal/service` in Go; `utils/` and `hooks/` in React).
 **Consequences.** Every domain rule has a test pinning its error path. Coverage is measured
 with the native tooling (`go tool cover`, `@vitest/coverage-v8`), so no extra infrastructure
 is introduced. A layer without tests is not considered delivered.
+
+---
+
+## ADR-011 — A free-form expression endpoint evaluated with a sandboxed engine
+**Status:** Accepted · Supersedes ADR-004
+
+**Context.** A calculator display produces a whole expression, not a discrete operation with
+one or two operands. Asking the frontend to split `2+3*√9` into calls would either move the
+parsing and precedence rules into the browser — contradicting ADR-002 — or force a chain of
+round trips.
+
+**Decision.** `POST /api/v1/evaluate` takes the expression as a string and answers with the
+result. Its design has four parts:
+
+1. **An allow-list in the controller.** `model` owns the operator catalogue and a regular
+   expression built from it; the controller rejects anything else with `400` before the
+   service is reached. It rejects, it does not sanitise: no escaping, no stripping. Since no
+   letter can ever pass, no identifier, builtin call or string literal can be injected into
+   the evaluator, which closes the injection vector structurally rather than by filtering
+   known-bad input. The length bound completes it: the grammar has no loops or variables, so
+   bounding the input bounds the cost of an evaluation and no timeout is needed.
+2. **`github.com/expr-lang/expr` as the engine.** It compiles to an AST, evaluates in a
+   sandbox with no access to the host, and accepts custom functions. This relaxes ADR-005
+   ("standard library only") for one dependency: writing and maintaining a correct parser with
+   operator precedence is work the requirement does not ask for, and the alternative — a
+   hand-written shunting-yard parser — would have been more code to own for the same result.
+3. **A normalizer in the service.** The catalogue and the engine do not speak the same
+   language, and translating between them is business logic: numbers are promoted to float
+   literals so `1/2` is `0.5` and not `0`, `√x` becomes a call to a registered `sqrt`, and the
+   postfix `x%` becomes `(x/100.0)` because `%` means modulo to the engine. `^` is passed
+   through unchanged, since the engine already reads it as exponentiation.
+4. **Domain errors instead of floating point artefacts.** Division is patched in the AST into
+   a call that reports dividing by zero as a domain error, `sqrt` reports a negative radicand,
+   and any remaining infinity or `NaN` becomes an explicit error. A panic inside the engine is
+   recovered and answered as `500`.
+
+**Consequences.** The frontend keeps no arithmetic: it sends what the user typed and renders
+what comes back (ADR-002 holds). The contract has one endpoint and one input field, and adding
+an operator means adding a symbol in `model` plus a rewrite rule in the normalizer. The price
+is a third-party dependency in the evaluation path and the obligation to keep the allow-list
+and the normalizer in agreement — which is why both are pinned by tests, including injection
+attempts as explicit cases.
+
+Two secondary decisions are recorded here: the percentage is **postfix** (`10%` is `0.1`, so
+`200+10%` is `200.1` and not `220`), chosen because it composes predictably inside a free-form
+expression; and results are **rounded to 10 decimals**, so `0.1+0.2` reads as `0.3` on the
+display without hiding any precision a calculator can show.

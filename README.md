@@ -4,16 +4,16 @@ A web calculator built as a monorepo: a **React + Vite + TypeScript** single-pag
 to a **Go** REST API, both running with **Docker Compose**.
 
 All arithmetic happens in the backend ([ADR-002](docs/ARCHITECTURE.md#adr-002--all-calculation-logic-lives-in-the-backend));
-the frontend captures the input, validates its shape and renders the result. Supported
+the frontend sends the expression the user typed and renders what comes back. Supported
 operations: **addition, subtraction, multiplication, division, exponentiation, square root and
-percentage**.
+percentage**, written as `+ - * / ^ √ %` with parentheses and decimals.
 
 ## Stack
 
 | Layer      | Technology |
 |------------|------------|
 | Frontend   | React 19, Vite 8, TypeScript 6, pnpm |
-| Backend    | Go 1.27, standard library only (`net/http`, `encoding/json`) |
+| Backend    | Go 1.27, standard library (`net/http`, `encoding/json`) + `expr-lang/expr` as the evaluator |
 | Tests      | Go `testing` (table-driven) · Vitest + React Testing Library |
 | Runtime    | Docker + Docker Compose (multi-stage: `dev` and `prod`) |
 | Production | Distroless image for the Go binary · Nginx for the static build |
@@ -58,30 +58,28 @@ Both are set in `docker-compose.yml`; `frontend/.env.example` documents the fron
 
 ## API example
 
-A single endpoint carries every operation
-([ADR-004](docs/ARCHITECTURE.md#adr-004--a-single-post-apiv1calculate-endpoint)):
+A single endpoint takes the whole expression as a string
+([ADR-011](docs/ARCHITECTURE.md#adr-011--a-free-form-expression-endpoint-evaluated-with-a-sandboxed-engine)):
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/calculate \
+curl -X POST http://localhost:8080/api/v1/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"operation":"divide","operandA":10,"operandB":4}'
+  -d '{"expression":"2+3*√9"}'
 ```
 
 ```json
 {
-  "operation": "divide",
-  "operandA": 10,
-  "operandB": 4,
-  "result": 2.5
+  "expression": "2+3*√9",
+  "result": 11
 }
 ```
 
 Business errors answer with `422` and a typed code:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/calculate \
+curl -X POST http://localhost:8080/api/v1/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"operation":"divide","operandA":10,"operandB":0}'
+  -d '{"expression":"10/0"}'
 ```
 
 ```json
@@ -91,8 +89,9 @@ curl -X POST http://localhost:8080/api/v1/calculate \
 }
 ```
 
-Square root takes a single operand (`operandB` is omitted). The full contract — operations,
-fields and error codes — is in [docs/API.md](docs/API.md).
+Anything outside the operator catalogue is rejected with `400` before it reaches the
+evaluator, so `{"expression":"abs(-2)"}` answers `INVALID_CHARACTERS`. The full contract —
+operators, fields and error codes — is in [docs/API.md](docs/API.md).
 
 ## Project layout
 
@@ -101,9 +100,9 @@ calculator-monorepo/
 ├── backend/              # Go API: model → controller → service
 │   ├── cmd/api/          # composition root
 │   └── internal/
-│       ├── model/        # requests, responses, domain errors
-│       ├── controller/   # HTTP adapter and error mapping
-│       └── service/      # calculation logic
+│       ├── model/        # operator catalogue, allow-list, requests, responses, errors
+│       ├── controller/   # HTTP adapter, error mapping, CORS
+│       └── service/      # normalizer + expression evaluation
 ├── frontend/             # React SPA
 │   └── src/
 │       ├── components/   # common/ (reusable) and calculator/ (domain)
@@ -126,13 +125,14 @@ Every structural decision is recorded, with its rationale and consequences, in
 | [ADR-001](docs/ARCHITECTURE.md#adr-001--monorepo-with-two-workspaces) | Monorepo with two independent workspaces |
 | [ADR-002](docs/ARCHITECTURE.md#adr-002--all-calculation-logic-lives-in-the-backend) | All calculation logic in the backend |
 | [ADR-003](docs/ARCHITECTURE.md#adr-003--simplified-three-layer-clean-architecture-in-the-backend) | Simplified three-layer clean architecture |
-| [ADR-004](docs/ARCHITECTURE.md#adr-004--a-single-post-apiv1calculate-endpoint) | A single `POST /calculate` endpoint |
+| [ADR-004](docs/ARCHITECTURE.md#adr-004--a-single-post-apiv1calculate-endpoint) | A single discrete-operation endpoint *(superseded by ADR-011)* |
 | [ADR-005](docs/ARCHITECTURE.md#adr-005--go-standard-library-no-web-framework) | Go standard library, no web framework |
 | [ADR-006](docs/ARCHITECTURE.md#adr-006--domain-errors-kept-separate-from-http-status-codes) | Domain errors decoupled from HTTP status codes |
 | [ADR-007](docs/ARCHITECTURE.md#adr-007--frontend-organised-by-responsibility) | Frontend organised by responsibility |
 | [ADR-008](docs/ARCHITECTURE.md#adr-008--docker-compose-as-the-only-way-to-run-the-project) | Docker Compose as the only way to run it |
 | [ADR-009](docs/ARCHITECTURE.md#adr-009--cors-instead-of-a-dev-proxy) | CORS instead of a dev proxy |
 | [ADR-010](docs/ARCHITECTURE.md#adr-010--unit-tests-and-coverage-are-part-of-the-definition-of-done) | Unit tests and coverage are part of done |
+| [ADR-011](docs/ARCHITECTURE.md#adr-011--a-free-form-expression-endpoint-evaluated-with-a-sandboxed-engine) | Free-form expression endpoint with a sandboxed evaluator |
 
 Working rules — clean code principles (KISS, YAGNI, DRY), conventions and the definition of
 done — live in `CLAUDE.md` at the root and in each workspace.
@@ -141,7 +141,8 @@ done — live in `CLAUDE.md` at the root and in each workspace.
 
 Each end is delivered with its own unit tests
 ([ADR-010](docs/ARCHITECTURE.md#adr-010--unit-tests-and-coverage-are-part-of-the-definition-of-done)).
-Minimum coverage: **80% per workspace**, **100% of branches** in the layers holding logic.
+Minimum coverage: **80% per workspace**, **100% of the reachable branches** in the layers
+holding the logic.
 
 ```bash
 # Backend
