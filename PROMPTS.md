@@ -40,3 +40,41 @@ never edited or rewritten.
 > and coverage as part of the definition of done.
 >
 > Finally, create a `.md` file where you keep an orderly record of every prompt I give you.
+
+---
+
+## #002 — 2026-09-17 — Backend: the `/evaluate` endpoint
+
+> I need to start developing the backend. My idea is to have an `/evaluate` endpoint, a POST
+> method that receives an `expression` parameter: the mathematical expression the frontend
+> sends as a string. It must return its response code, the error with its message when it
+> fails, and the result.
+>
+> In the controller layer, validate the string with a regular expression to prevent injections
+> (the frontend sends the string using operator symbols — define them and store them in the
+> context files, keeping in mind they cover addition, subtraction, multiplication, division,
+> exponentiation, square root and percentage), checking whatever is needed to confirm that the
+> string is a mathematical operation: the operators plus the numbers.
+>
+> Once validated, pass it to the service layer, where I want you to rely on a library to parse
+> and evaluate the operation. You can use the Expr library, which I found while researching,
+> but if you know a better one I would like to hear about it.
+>
+> The library requires words for certain expressions (`pow`, `sqrt`), so those need to be
+> mapped, and that mapping is part of the business logic. Once mapped and the string parsed
+> into what the evaluator needs, evaluate the operation and return the result; if it does not
+> pass some validation, return the corresponding error.
+>
+> Do a general analysis of the implementation. Ask me anything you are unsure about, and if
+> everything is clear, switch to plan mode and start the specific analysis of the
+> functionality to be implemented.
+
+---
+
+## #003 — 2026-09-17 — Comment policy
+
+> Another detail and decision to record in general is about comments: only write a comment
+> when you consider that it adds value to the code, and make sure the declared variables are
+> self-expressive in line with clean code. When a method, a variable or a fragment of code is
+> not understandable at first glance, then go ahead and write well structured, clear comments —
+> but only if they are required.
