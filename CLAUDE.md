@@ -27,20 +27,30 @@ Supporting documentation:
 - `docs/ARCHITECTURE.md` — architecture decision records (ADRs) and their rationale.
 - `docs/API.md` — HTTP contract between frontend and backend.
 
-## Supported operations
+## Operator catalogue
 
-| Operation      | `operation` | Operands                  |
-|----------------|-------------|---------------------------|
-| Addition       | `add`       | a, b                      |
-| Subtraction    | `subtract`  | a, b                      |
-| Multiplication | `multiply`  | a, b                      |
-| Division       | `divide`    | a, b (b ≠ 0)              |
-| Exponentiation | `power`     | a (base), b (exponent)    |
-| Square root    | `sqrt`      | a (a ≥ 0)                 |
-| Percentage     | `percent`   | a (value), b (percentage) |
+The frontend sends a whole expression as a string and the backend evaluates it. These are the
+only symbols the API accepts; anything else is rejected before reaching the evaluator.
 
-Domain rules: `divide` with b = 0 and `sqrt` with a < 0 are business errors (HTTP 422),
-never panics and never `NaN`.
+| Symbol  | Operation      | Position                | Example    | Result |
+|---------|----------------|-------------------------|------------|--------|
+| `+`     | Addition       | binary                  | `2+3`      | `5`    |
+| `-`     | Subtraction    | binary, also unary sign | `10-4`     | `6`    |
+| `*`     | Multiplication | binary                  | `6*7`      | `42`   |
+| `/`     | Division       | binary                  | `9/3`      | `3`    |
+| `^`     | Exponentiation | binary                  | `2^10`     | `1024` |
+| `√`     | Square root    | prefix                  | `√81`      | `9`    |
+| `%`     | Percentage     | postfix                 | `200*10%`  | `20`   |
+| `( )`   | Grouping       | —                       | `(2+3)*4`  | `20`   |
+| `.`     | Decimal point  | —                       | `2.5+1`    | `3.5`  |
+| `0`–`9` | Digits         | —                       | —          | —      |
+
+`√` binds to the operand on its right (`√9+7` is `10`), and `%` means "divided by one
+hundred" (`10%` is `0.1`).
+
+Domain rules: dividing by zero and taking the square root of a negative number are business
+errors (HTTP 422). A result is always a finite number: never a panic, never `NaN`, never an
+infinity.
 
 ## Clean code principles
 
@@ -76,7 +86,14 @@ the decision is wrong.
   code and message.
 - **No magic numbers or strings**: named constants.
 - **English everywhere**: identifiers, routes, JSON fields, comments, docs and commits.
-- **Comments explain why**, not what. The code says what.
+- **Comments are the exception, not the habit.** The first tool for making code understandable
+  is naming: variables, functions and types must be self-expressive enough that the code reads
+  without help. A comment is written only when it adds something the code cannot say by
+  itself — the reason behind a decision, a non-obvious constraint, a trade-off, a subtle edge
+  case — and never to restate what the next line already says. When a comment is needed, it is
+  written properly: complete sentences, explaining the why, kept next to the code it explains
+  and updated with it. A comment that only paraphrases the code is deleted, and code that
+  needs a comment to be readable is renamed or split first.
 - **No new dependencies without justification**: the standard library and what is already
   installed win by default.
 - **Small commits**, one logical change each.
@@ -92,7 +109,9 @@ Every feature is delivered **with its unit tests**. A layer is not done until it
 
 Rules:
 - Minimum coverage **80% per workspace**; the backend service layer and the frontend
-  `utils/` and `hooks/` are held to **100% of branches**, since that is where the logic is.
+  `utils/` and `hooks/` are held to **100% of the reachable branches**, since that is where the
+  logic is. A defensive guard that can only fire if a dependency misbehaves is exempt —
+  covering it would mean weakening the code to make it fail.
 - Every domain rule has a test proving its error path (division by zero, negative root).
 - Tests live next to the code they exercise (`*_test.go`, `*.test.ts(x)`).
 - A test asserts behaviour, not implementation details.
