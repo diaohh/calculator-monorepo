@@ -3,6 +3,9 @@
 # --- Base stage: dependencies installed with pnpm ---
 FROM node:24-alpine AS base
 WORKDIR /app
+# The pnpm version comes from the "packageManager" field in package.json, so the container
+# installs with exactly the same tool as the host
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
