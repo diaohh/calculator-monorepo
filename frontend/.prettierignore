@@ -1,0 +1,9 @@
+dist
+node_modules
+pnpm-lock.yaml
+
+# Markdown in this repository is hand-wrapped and its tables are hand-aligned, so reflowing it
+# would produce noise instead of consistency.
+*.md
+coverage
+.pnpm-store
