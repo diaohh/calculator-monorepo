@@ -78,3 +78,52 @@ never edited or rewritten.
 > self-expressive in line with clean code. When a method, a variable or a fragment of code is
 > not understandable at first glance, then go ahead and write well structured, clear comments —
 > but only if they are required.
+
+---
+
+## #004 — 2026-09-17 — Frontend: mocking the calculator UI
+
+> I need you to review the application context; now I need us to focus on the frontend. I need
+> you to help me mock a calculator UI using Tailwind to optimise the styles, TanStack (React
+> Query) to handle the requests and cache, plus Mantine as the component library so the visual
+> result is attractive.
+>
+> I need the calculator page to be responsive. You can implement a simple calculator in the
+> centre of the screen, in a dark theme that is easy on the eyes, using greys or dark blues.
+>
+> You can take mobile phone calculators as a reference; the idea is that you can click the
+> calculator buttons to write, or use the computer's normal keyboard. The expression being
+> written must be shown at the top, and the result is only shown when the "equals" (=) button
+> is clicked.
+>
+> Remember to use React design patterns where they are needed, follow the proposed structure of
+> the application, and also remember not to use effects (`useEffect`) unless strictly
+> necessary, fulfilling their reason for being (effects are for connecting the app to the
+> outside world). Nor do you need to overuse memoization — neither `useMemo` nor `useCallback` —
+> in the first instance; remember this is a simple single-page application.
+>
+> Try to do a general analysis of the implementation first and gather any doubts; if you need
+> to clarify them, let me know. Once you have all the context clear and ready, you can switch
+> to plan mode to start the specific analysis and the planning of the implementation.
+
+Scope agreed after the analysis: this iteration covered only the UI mock and the dependency
+setup. Integration, tests, validation, documentation and commits were deferred to #006.
+
+---
+
+## #005 — 2026-09-17 — Formatting, and part two of the frontend
+
+> Now run Prettier to format all the code. Once you have run it, go ahead with the planning of
+> part 2 of the implementation, which would be the integration with the backend, validation,
+> implementation of unit tests and updating the documentation.
+
+---
+
+## #007 — 2026-09-17 — Rules for what can be typed next
+
+> Something additional is that the calculator, when you click several times or try to write
+> several symbols in a row, should not allow it unless certain conditions hold. That is, you
+> should not be able to put several `*` (multiplications) because they would throw an error,
+> but it should let me use `-` (negative) to indicate a negative number, or play with the
+> parentheses: you should not be able to open several parentheses one after another, but you
+> should be able to close one as long as there is one opened before.
